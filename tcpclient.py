@@ -65,8 +65,8 @@ def part1():
 def part2(hostname, port):
     print("********** PART 2 **********")
     # Create the client address
-    # HOST = socket.gethostbyname(hostname)  # "127.0.0.1"
-    sin = (hostname, int(port))
+    HOST = socket.gethostbyname(hostname)  # "127.0.0.1"
+    sin = (HOST, int(port))
 
     # Create a datagram socket for TCP
     try:
@@ -111,15 +111,43 @@ def part2(hostname, port):
             else:
                 print(f'File size: {filesize}')
                 bytes_recieved = 0
-                with open(message_split[1], 'wb') as output_file:
-                    while bytes_recieved < filesize:
-                        data = tcp_client_socket.recv(BUFFER)
-                        output_file.write(data)
-                        bytes_recieved += BUFFER
+                data = b''
+                while len(data) < filesize:
+                    toRead = filesize - len(data)
+                    if toRead > BUFFER:
+                        packet = tcp_client_socket.recv(BUFFER)
+                    else:
+                        packet = tcp_client_socket.recv(filesize - len(data))
+                    data += packet
+                with open(message_split[1], 'wb') as outFile:
+                    outFile.write(data)
+
+
+                # while bytes_recieved < filesize:
+                #     if filesize > BUFFER:
+                #         print('Hello1')
+                #         temp = tcp_client_socket.recv(BUFFER)
+                #         print('Hello2')
+                #         data += temp
+                #         bytes_recieved += len(temp)
+                #     elif filesize <= BUFFER:
+                #         temp = tcp_client_socket.recv(filesize)
+                #         data += temp
+                #     else:
+                #         print('ERROR')
+                #     filesize -= len(temp)
+                #     print(f'bytes: {bytes_recieved}')
+                #     print(f'temp: {len(temp)}')
+                #     print(f'filesize: {filesize}')
+                # print('Hello')
+                # with open(message_split[1], 'wb') as output_file:
+                #     output_file.write(data)
+                #     # output_file.close()
                 print('File transfer complete.')
                 continue
 
         if message_split[0] == 'UP':
+            filename = message_split[1]
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
                 message_int = int.from_bytes(message_bytes, 'little')

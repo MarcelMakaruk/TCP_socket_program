@@ -11,8 +11,6 @@ Member 3: mmaka4
 import socket
 import sys
 import os
-import getpass
-import ftplib
 
 BUFFER = 4096
 
@@ -79,9 +77,9 @@ def part1():
 
 def part2(port):
     print("********** PART 2 **********")
-    # hostname = 'localhost'
-    # host = socket.gethostbyname(hostname)  # If stops working use ''
-    host = 'student00.ischool.illinois.edu'
+    hostname = 'localhost'
+    host = socket.gethostbyname(hostname)  # If stops working use ''
+    # host = 'student00.ischool.illinois.edu'
     sin = (host, int(port))
 
     # Loop that ensures that server stays up
@@ -132,7 +130,6 @@ def part2(port):
             # TODO: DN
             if message_split[0] == "DN":
                 filename = message_split[1]
-
                 if os.path.isfile(filename): 
                     file_size = os.path.getsize(filename)
                     file_size_bytes = file_size.to_bytes(4, 'little')
@@ -144,10 +141,12 @@ def part2(port):
 
                 if file_size_bytes != -1:
                     with open(filename, 'rb') as f:
-                        data = f.read(BUFFER)
-                        while data:
-                            connection.send(data)
-                            data = f.read(BUFFER)
+                        data = f.read()
+                        connection.sendall(data)
+                        # while data:
+                        #     connection.send(data)
+                        #     data = f.read(BUFFER)
+                        f.close()
                     print(f"{filename} was successfully transferred to the client.")
 
             # TODO: UP
@@ -261,7 +260,6 @@ def part2(port):
                     acknowledgement = socket.htonl(-1)
                     acknowledgement = acknowledgement.to_bytes(4, 'little')
                     connection.send(acknowledgement)
-                    
 
             # QUIT
             if message_split[0] == 'QUIT':
