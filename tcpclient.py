@@ -1,12 +1,3 @@
-"""
-IS496: Computer Networks (Spring 2022)
-Programming Assignment 2
-Name and netid of each member:
-Member 1: jcarte39
-Member 2: mkhala6
-Member 3: mmaka4
-"""
-
 # Import any necessary libraries below
 import socket
 import sys
@@ -17,7 +8,7 @@ BUFFER = 4096
 
 def part1():
     print("********** PART 1 **********")
-    HOST = 'student00.ischool.illinois.edu'
+    HOST = 'localhost'
     PORT = 41014
     sin = (HOST, PORT)
 
