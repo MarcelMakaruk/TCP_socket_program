@@ -17,7 +17,6 @@ BUFFER = 4096
 
 def part1():
     print("********** PART 1 **********")
-    hostname = 'localhost'
     host = 'student00.ischool.illinois.edu'
     PORT = 41014
     sin = (host, PORT)
@@ -65,7 +64,7 @@ def part1():
 
     # Send an acknowledgement (e.g., integer of 1) to the client
     try:
-        acknowledgement = socket.htonl(1)
+        acknowledgement = socket.htons(1)
         acknowledgement_bytes = acknowledgement.to_bytes(4, 'little')
         connection.send(acknowledgement_bytes)
     except socket.error as e:
@@ -77,9 +76,7 @@ def part1():
 
 def part2(port):
     print("********** PART 2 **********")
-    hostname = 'localhost'
-    host = socket.gethostbyname(hostname)  # If stops working use ''
-    # host = 'student00.ischool.illinois.edu'
+    host = 'student00.ischool.illinois.edu'
     sin = (host, int(port))
 
     # Loop that ensures that server stays up
@@ -127,7 +124,7 @@ def part2(port):
                 print('Failed to receive message.')
                 sys.exit()
 
-            # TODO: DN
+            # DN
             if message_split[0] == "DN":
                 filename = message_split[1]
                 if os.path.isfile(filename): 
@@ -143,33 +140,37 @@ def part2(port):
                     with open(filename, 'rb') as f:
                         data = f.read()
                         connection.sendall(data)
-                        # while data:
-                        #     connection.send(data)
-                        #     data = f.read(BUFFER)
                         f.close()
                     print(f"{filename} was successfully transferred to the client.")
 
-            # TODO: UP
+            # UP
             if message_split[0] == "UP":
-                filename = message_split[1]
-                if os.path.isfile(filename):
-                    print(f"File {filename} already exists on the server.")
-                    acknowledgement = socket.htonl(-1)
-                    acknowledgement = acknowledgement.to_bytes(4, 'little')
-                    connection.send(acknowledgement)
-                else:
-                    file_size_bytes = connection.recv(BUFFER)
-                    file_size = int.from_bytes(file_size_bytes, 'little')
-                    print(f"Receiving {filename} from the client...")
-                    bytes_received = 0
-                    with open(message_split[1], 'wb') as output_file:
-                        while bytes_received < file_size:
-                            data = connection.recv(BUFFER)
-                            output_file.write(data)
-                            bytes_received += BUFFER
-                        print(f"File {filename} was successfully transferred to the server.")
+                try:
+                    message_bytes = connection.recv(BUFFER)
+                    filesize = int.from_bytes(message_bytes, 'little')
 
-            # TODO: RM
+                except socket.error as e:
+                    print('Failed to receive data.')
+                    sys.exit()
+                if filesize == -1:
+                    print('Error. File not found.')
+                    continue
+                else:
+                    print(f'File size: {filesize}')
+                    data = b''
+                    while len(data) < filesize:
+                        toRead = filesize - len(data)
+                        if toRead > BUFFER:
+                            packet = connection.recv(BUFFER)
+                        else:
+                            packet = connection.recv(filesize - len(data))
+                        data += packet
+                    with open(message_split[1], 'wb') as outFile:
+                        outFile.write(data)
+                    print('File transfer complete.')
+                    continue
+
+            # RM
             if message_split[0] == "RM":
                 filename = message_split[1]
                 if os.path.isfile(filename):
@@ -184,16 +185,19 @@ def part2(port):
                 else:
                     print(f"File {filename} does not exist on the server.")
 
-            # TODO: LS
+            # LS
             if message_split[0] == "LS":
                 files = os.listdir()
                 files_string = ""
-                for file in files:
-                    files_string += file + " "
-                files_string = files_string[:-1]
+                if len(files) == 0:
+                    files_string = "No files in directory."
+                else:
+                    for file in files:
+                        files_string += file + " "
+                    files_string = files_string[:-1]
                 connection.send(files_string.encode())
 
-            # TODO: MKDIR
+            # MKDIR
             if message_split[0] == "MKDIR":
                 directory_name = message_split[1]
                 try:
@@ -215,12 +219,12 @@ def part2(port):
                     connection.send(acknowledgement)
 
 
-            # TODO: RMDIR
+            # RMDIR
             if message_split[0] == "RMDIR":
                 directory_name = message_split[1]
                 try:
                     if os.path.isdir(directory_name):
-                        if os.listdir(directory_name) == []:
+                        if len(os.listdir(directory_name)) == 0:
                             acknowledgement = socket.htonl(1)
                             acknowledgement = acknowledgement.to_bytes(4, 'little')
                             connection.send(acknowledgement)
@@ -240,7 +244,7 @@ def part2(port):
                     acknowledgement = acknowledgement.to_bytes(4, 'little')
                     connection.send(acknowledgement)
 
-            # TODO: CD
+            # CD
             if message_split[0] == "CD":
                 directory_name = message_split[1]
                 try:
@@ -266,9 +270,6 @@ def part2(port):
                 print('Connection closed.\n')
                 tcp_server_socket.close()
                 break
-
-
-
 
 
 if __name__ == '__main__':

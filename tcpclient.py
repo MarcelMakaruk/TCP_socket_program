@@ -10,21 +10,19 @@ Member 3: mmaka4
 # Import any necessary libraries below
 import socket
 import sys
+import os
 
 BUFFER = 4096
 
 
 def part1():
     print("********** PART 1 **********")
-    HOST = 'student01.ischool.illinois.edu'
+    HOST = 'student00.ischool.illinois.edu'
     PORT = 41014
+    sin = (HOST, PORT)
 
     # Message (in bytes) to test the code
     message = b"Hello World"
-
-    # Convert the host name to the corresponding IP address
-    # HOST = socket.gethostbyname(hostname)  # "127.0.0.1"
-    sin = (HOST, PORT)
 
     # Create a datagram socket for TCP
     try:
@@ -62,11 +60,9 @@ def part1():
     tcp_client_socket.close()
 
 
-def part2(hostname, port):
+def part2(host, port):
     print("********** PART 2 **********")
-    # Create the client address
-    HOST = socket.gethostbyname(hostname)  # "127.0.0.1"
-    sin = (HOST, int(port))
+    sin = (host, int(port))
 
     # Create a datagram socket for TCP
     try:
@@ -97,11 +93,12 @@ def part2(hostname, port):
             print('Connection closed.')
             break
 
+        # DN
         if message_split[0] == 'DN':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
-                message_int = int.from_bytes(message_bytes, 'little')
-                filesize = socket.ntohl(message_int)
+                filesize = int.from_bytes(message_bytes, 'little')
+
             except socket.error as e:
                 print('Failed to receive data.')
                 sys.exit()
@@ -110,7 +107,6 @@ def part2(hostname, port):
                 continue
             else:
                 print(f'File size: {filesize}')
-                bytes_recieved = 0
                 data = b''
                 while len(data) < filesize:
                     toRead = filesize - len(data)
@@ -121,62 +117,29 @@ def part2(hostname, port):
                     data += packet
                 with open(message_split[1], 'wb') as outFile:
                     outFile.write(data)
-
-
-                # while bytes_recieved < filesize:
-                #     if filesize > BUFFER:
-                #         print('Hello1')
-                #         temp = tcp_client_socket.recv(BUFFER)
-                #         print('Hello2')
-                #         data += temp
-                #         bytes_recieved += len(temp)
-                #     elif filesize <= BUFFER:
-                #         temp = tcp_client_socket.recv(filesize)
-                #         data += temp
-                #     else:
-                #         print('ERROR')
-                #     filesize -= len(temp)
-                #     print(f'bytes: {bytes_recieved}')
-                #     print(f'temp: {len(temp)}')
-                #     print(f'filesize: {filesize}')
-                # print('Hello')
-                # with open(message_split[1], 'wb') as output_file:
-                #     output_file.write(data)
-                #     # output_file.close()
                 print('File transfer complete.')
                 continue
 
+        # UP
         if message_split[0] == 'UP':
             filename = message_split[1]
-            try:
-                message_bytes = tcp_client_socket.recv(BUFFER)
-                message_int = int.from_bytes(message_bytes, 'little')
-                acknowledgement = socket.ntohl(message_int)
-            except socket.error as e:
-                print('Failed to receive data.')
-                sys.exit()
-            if acknowledgement == -1:
-                print('Server denied file transfer. File may already exist on server.')
-                continue
+            if os.path.isfile(filename):
+                file_size = os.path.getsize(filename)
+                file_size_bytes = file_size.to_bytes(4, 'little')
+                tcp_client_socket.send(file_size_bytes)
             else:
-                filesize = 0
-                with open(message_split[1], 'rb') as f:
-                    while True:
-                        chunk = f.read(BUFFER)
-                        if not chunk:
-                            break
-                        filesize += len(chunk)
-                print(f'File size: {filesize}')
-                message_bytes = bytes(str(filesize), 'utf-8')
-                tcp_client_socket.send(message_bytes)
-                with open(message_split[1], 'rb') as f:
-                        data = f.read(BUFFER)
-                        while data:
-                            tcp_client_socket.send(data)
-                            data = f.read(BUFFER)
-                print('File transfer complete.')
-                continue
+                acknowledgement = socket.htonl(-1)
+                acknowledgement = acknowledgement.to_bytes(4, 'little')
+                tcp_client_socket.send(acknowledgement)
 
+            if file_size_bytes != -1:
+                with open(filename, 'rb') as f:
+                    data = f.read()
+                    tcp_client_socket.sendall(data)
+                    f.close()
+                print(f"{filename} was successfully transferred to the server.")
+
+        # RM
         if message_split[0] == 'RM':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
@@ -199,7 +162,8 @@ def part2(hostname, port):
                     tcp_client_socket.send(message_bytes)
                     print('Delete abandoned by the user!')
                 continue
-        
+
+        # LS
         if message_split[0] == 'LS':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
@@ -211,6 +175,7 @@ def part2(hostname, port):
                 sys.exit()
             continue
 
+        # MKDIR
         if message_split[0] == 'MKDIR':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
@@ -228,7 +193,8 @@ def part2(hostname, port):
             else:
                 print('Directory created.')
                 continue
-        
+
+        # RMDIR
         if message_split[0] == 'RMDIR':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
@@ -244,17 +210,18 @@ def part2(hostname, port):
                 print('Directory does not exist.')
                 continue
             else:
-                confirmation = input('Are you sure you want to delete this file?\n')
+                confirmation = input('Are you sure you want to delete this directory?\n')
                 if confirmation == 'Yes' or confirmation == 'yes' or confirmation == 'y' or confirmation == 'Y':
                     message_bytes = bytes('y', 'utf-8')
                     tcp_client_socket.send(message_bytes)
+                    print('Directory removed')
                 else:
                     message_bytes = bytes('n', 'utf-8')
                     tcp_client_socket.send(message_bytes)
                     print('Delete abandoned by the user!')
-                print('Directory removed.')
                 continue
-        
+
+        # CD
         if message_split[0] == 'CD':
             try:
                 message_bytes = tcp_client_socket.recv(BUFFER)
@@ -272,12 +239,6 @@ def part2(hostname, port):
             else:
                 print('Changed current directory')
                 continue
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
